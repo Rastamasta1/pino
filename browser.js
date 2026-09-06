@@ -291,6 +291,68 @@ pino.levels = {
 }
 
 pino.stdSerializers = stdSerializers
+
+function levelToNumber (level, levels) {
+  if (typeof level === 'number') return level
+  if (levels[level] === undefined) {
+    throw Error('unknown level ' + level)
+  }
+  return levels[level]
+}
+
+function normalizeStreamEntry (entry, levels) {
+  const isDirectStream = typeof entry.write === 'function'
+  const stream = isDirectStream ? entry : entry.stream
+  if (!stream || typeof stream.write !== 'function') {
+    throw Error('pino – multistream stream object needs to implement either StreamEntry or DestinationStream interface')
+  }
+  const level = entry.level === undefined ? levels.info : levelToNumber(entry.level, levels)
+  return { stream, level }
+}
+
+function sortStreamsByLevel (a, b) {
+  return a.level - b.level
+}
+
+pino.multistream = function multistream (streamsArray, opts) {
+  opts = opts || {}
+  const levels = Object.assign({}, pino.levels.values, opts.levels)
+
+  const arr = Array.isArray(streamsArray) ? streamsArray : [streamsArray]
+
+  const res = {
+    write: multistreamWrite,
+    add: multistreamAdd,
+    streams: [],
+    minLevel: 0,
+    streamLevels: levels
+  }
+
+  arr.forEach(function (entry) {
+    multistreamAdd.call(res, entry)
+  })
+
+  return res
+
+  function multistreamWrite (o) {
+    const level = o && o.level
+    for (const entry of this.streams) {
+      if (entry.level <= level) {
+        entry.stream.write(o)
+      }
+    }
+  }
+
+  function multistreamAdd (entry) {
+    if (!entry) return this
+    const normalized = normalizeStreamEntry(entry, levels)
+    this.streams.push(normalized)
+    this.streams.sort(sortStreamsByLevel)
+    this.minLevel = this.streams[0].level
+    return this
+  }
+}
+
 pino.stdTimeFunctions = Object.assign({}, { nullTime, epochTime, unixTime, isoTime })
 
 function getBindingChain (logger) {
