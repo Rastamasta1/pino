@@ -87,12 +87,23 @@ function shouldSerialize (serialize, serializers) {
   return false
 }
 
-function pino (opts) {
+function pino (opts, destination) {
   opts = opts || {}
   opts.browser = opts.browser || {}
 
   const transmit = opts.browser.transmit
   if (transmit && typeof transmit.send !== 'function') { throw Error('pino: transmit option must have a send function') }
+
+  if (!opts.browser.write) {
+    // no explicit browser.write: accept a destination that is a function, or an object exposing a write function (e.g. pino.multistream())
+    if (typeof destination === 'function') {
+      opts.browser.write = destination
+    } else if (destination && typeof destination.write === 'function') {
+      // wrap so records route through destination.write(o) instead of assigning the
+      // raw object, which would lack per-level methods and fall back to console
+      opts.browser.write = function (o) { destination.write(o) }
+    }
+  } // else: opts.browser.write is already set, so the destination argument is ignored
 
   const proto = opts.browser.write || _console
   if (opts.browser.write) opts.browser.asObject = true

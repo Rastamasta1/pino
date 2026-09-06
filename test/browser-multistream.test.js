@@ -56,3 +56,61 @@ test('a bare { write } entry defaults to level info', ({ end, is }) => {
   is(ms.minLevel, pino.levels.values.info)
   end()
 })
+
+test('destination passed as second arg receives records when opts.browser.write is unset', ({ end, is }) => {
+  const calls = []
+  const destination = { write (o) { calls.push(o) } }
+  const logger = pino({ browser: {} }, destination)
+
+  logger.info('x')
+
+  is(calls.length, 1)
+  is(calls[0].msg, 'x')
+  is(calls[0].level, 30)
+  end()
+})
+
+test('child logger writes through the same destination and carries its bindings', ({ end, is }) => {
+  const calls = []
+  const destination = { write (o) { calls.push(o) } }
+  const logger = pino({ browser: {} }, destination)
+  const child = logger.child({ a: 'property' })
+
+  child.info('hello child')
+
+  is(calls.length, 1)
+  is(calls[0].msg, 'hello child')
+  is(calls[0].a, 'property')
+  end()
+})
+
+test('explicit opts.browser.write wins over a passed destination', ({ end, is }) => {
+  const writeCalls = []
+  const destCalls = []
+  const destination = { write (o) { destCalls.push(o) } }
+  const logger = pino({
+    browser: {
+      write (o) { writeCalls.push(o) }
+    }
+  }, destination)
+
+  logger.info('x')
+
+  is(writeCalls.length, 1)
+  is(destCalls.length, 0)
+  end()
+})
+
+test('no destination passed still logs to console', ({ end, is }) => {
+  const orig = console.info
+  let called = false
+  console.info = function (...args) {
+    called = true
+    is(args[0], 'hello world')
+  }
+  const logger = pino({ browser: {} })
+  logger.info('hello world')
+  console.info = orig
+  is(called, true)
+  end()
+})
