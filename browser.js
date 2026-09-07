@@ -88,9 +88,15 @@ function shouldSerialize (serialize, serializers) {
   return false
 }
 
-function pino (opts) {
+function pino (opts, destination) {
   opts = opts || {}
   opts.browser = opts.browser || {}
+
+  if (!opts.browser.write && destination && typeof destination.write === 'function') {
+    opts.browser.write = function (o) {
+      destination.write(o)
+    }
+  }
 
   const transmit = opts.browser.transmit
   if (transmit && typeof transmit.send !== 'function') { throw Error('pino: transmit option must have a send function') }
