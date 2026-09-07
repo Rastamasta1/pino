@@ -2,6 +2,7 @@
 
 const format = require('quick-format-unescaped')
 const Redact = require('@pinojs/redact')
+const browserMultistream = require('./lib/browser-multistream.js')
 
 module.exports = pino
 
@@ -292,6 +293,7 @@ pino.levels = {
 
 pino.stdSerializers = stdSerializers
 pino.stdTimeFunctions = Object.assign({}, { nullTime, epochTime, unixTime, isoTime })
+pino.multistream = browserMultistream.multistream
 
 function getBindingChain (logger) {
   const bindings = []
