@@ -26,7 +26,6 @@ The following statics are available in Node.js only:
 | --- | --- |
 | [`pino.destination()`](/docs/api.md#pino-destination) | Returns a [`SonicBoom`](https://github.com/pinojs/sonic-boom) instance writing to a file descriptor. |
 | [`pino.transport()`](/docs/api.md#pino-transport) | Runs a [transport](/docs/transports.md) on a worker thread. |
-| [`pino.multistream()`](/docs/api.md#pino-multistream) | Fans out to multiple destination streams. |
 
 `pino.levels`, `pino.stdSerializers` and `pino.stdTimeFunctions` are available in
 both environments.
@@ -57,18 +56,37 @@ const logger = pino.destination
 ```
 
 Note that the browser build's `pino()` accepts the options object only. A second
-`destination` argument is accepted but ignored, so a logger constructed with one
-still writes to the console rather than failing:
+`destination` argument IS honoured when it exposes a `write` function: a logger
+constructed with one sends its output there instead of to the console:
 
 ```js
-// in the browser the second argument is ignored, not honoured
+// in the browser, a destination exposing write() receives the output
 const logger = pino({ level: 'info' }, someDestination)
-logger.info('still goes to the console')
+logger.info('sent to someDestination.write(), not the console')
 ```
 
 Assigning a no-op shim onto the `pino` export (`pino.destination = () => {}`)
 works too, but it mutates a module object shared with every other importer in the
 bundle; guarding the call site keeps the change local.
+
+### `pino.multistream()` in the browser
+
+`pino.multistream()` is supported in the browser build. It fans out writes to
+multiple destinations, each of which may be a plain object exposing a `write`
+function (or `{ stream, level }`), and the result can itself be passed as the
+browser `destination` argument since it also exposes `write`:
+
+```js
+const pino = require('pino')
+
+const stream1 = { write (msg) { /* ... */ } }
+const stream2 = { write (msg) { /* ... */ } }
+
+const streams = pino.multistream([stream1, stream2])
+const logger = pino({ level: 'info' }, streams)
+
+logger.info('sent to both stream1.write() and stream2.write()')
+```
 
 ## Options
 
